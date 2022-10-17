@@ -29,7 +29,10 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [
+              "src/assets/js/setup.js",
+              "src/assets/js/libfluidsynth-2.2.1.js"
+            ]
           },
           "configurations": {
             "production": {
@@ -66,6 +69,9 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "port": 4100
+          },
           "configurations": {
             "production": {
               "browserTarget": "GotSynth:build:production"
