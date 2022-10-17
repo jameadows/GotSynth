@@ -8,14 +8,14 @@ import {FLuidDeployer, FluidService} from "../services/fluid-service";
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements AfterViewInit {
   title = 'GotSynth';
   mod: any;
-  @Input()
-  public fluidReady: boolean = false;
   private fluidService!: FluidService;
+  public statusMsg = "";
+  public fluidReady = false;
 
   constructor(private http: HttpClient, private cd: ChangeDetectorRef, private fluidDeployer: FLuidDeployer, private httpClient: HttpClient) {
     // const prm = this.instantiateWasm("/assets/js/libfluidsynth-2.2.1",{})
@@ -24,40 +24,48 @@ export class AppComponent implements AfterViewInit {
     // var x=window.Module.instantiateAsync();
     console.log("");
     // @ts-ignore
-    window.Module['onRuntimeInitialized'] = () => {
-      this.mod = window.Module;
-      this.fluidReady = true;
-      cd.detectChanges();
-    }
+    /*
+        window.Module['onRuntimeInitialized'] = () => {
+          this.mod = window.Module;
+          this.fluidReady = true;
+          cd.detectChanges();
+        }
+    */
   }
 
   public doStart(): void {
+    this.statusMsg = "Loading synthesizer module";
     this.fluidDeployer.startFluidService().subscribe({
       next: instance => {
         this.fluidService = instance;
+        this.statusMsg = "";
         console.log("Fluid worklet started");
-        this.fsTest();
-      }, error: err => console.error(err)
+        this.fetchSoundbank();
+      }, error: err => {
+        console.error(err);
+        alert("Failed to start synthesizer module");
+      }
     });
   }
 
-  public doStop(): void {
+  public doStop():
+    void {
   }
 
-  public fsTest(): void {
-    try {
-      this.mod.FS.mkdir('/sf');
-    } catch (e) {
-      console.error(e);
-    }
-    this.httpClient.get('/assets/Unison.sf2', {responseType: 'arraybuffer'}).subscribe(result => {
+  public fetchSoundbank(): void {
+    this.statusMsg = "Fetching soundbank"
+    this.httpClient.get(document.baseURI + 'assets/Unison.sf2', {responseType: 'arraybuffer'}).subscribe(result => {
       this.fluidService.port.postMessage({type: 'load_soundbank', bank: result});
+      this.statusMsg = "";
+      this.fluidReady = true;
     });
-    // this.mod.FS.mount()
-    console.log();
   }
 
   noteRun(): void {
+    if(this.fluidService.context.state != 'running')
+    {
+      this.fluidService.context['resume']();
+    }
     let note = 60;
     let inc = 1;
     let id = setInterval(() => {
@@ -74,6 +82,11 @@ export class AppComponent implements AfterViewInit {
   playNote(note: number, duration: number) {
     this.noteOn(note);
     setTimeout(() => this.noteOff(note), duration);
+  }
+
+  public randomNote(): void {
+    const note = Math.floor(Math.random() * 80) + 20;
+    this.playNote(note, 250);
   }
 
   public noteOn(note = 60): void {
@@ -140,7 +153,8 @@ export class AppComponent implements AfterViewInit {
 
   }
 
-  private makeWAString(input: string): number {
+  private makeWAString(input: string
+  ): number {
     const len = this.mod.lengthBytesUTF8(input) + 1;
     const pcStr = this.mod._malloc(len);
     this.mod.stringToUTF8(input, pcStr, len);
@@ -148,8 +162,6 @@ export class AppComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    // @ts-ignore
-    // const dog = window.Module._new_fluid_settings();
-    console.log('view init');
+    this.doStart();
   }
 }

@@ -8,7 +8,7 @@ function statusMsg(msg: string) {
 }
 
 export class FluidService extends AudioWorkletNode {
-  static WorkletModule = '/assets/js/fluid-worklet.js';
+  static WorkletModule = 'assets/js/fluid-worklet.js';
   static WorkletClass = 'fluid-worklet';
 
   constructor(
@@ -62,8 +62,8 @@ export class FLuidDeployer {
   private startAudioProcessor(subject: Subject<FluidService>): void {
 
     let context: AudioContext = new AudioContext({sampleRate: 48000});
-    context.audioWorklet.addModule('/assets/js/libfluidsynth-2.2.1.js').then(() =>
-      context.audioWorklet.addModule(FluidService.WorkletModule).then(() => {
+    context.audioWorklet.addModule(document.baseURI+'assets/js/libfluidsynth-2.2.1.js').then(() =>
+      context.audioWorklet.addModule(document.baseURI+FluidService.WorkletModule).then(() => {
         let instance = new FluidService(context, {
           numberOfInputs: 0,
           numberOfOutputs: 1,

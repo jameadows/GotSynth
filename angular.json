@@ -30,8 +30,6 @@
               "src/styles.css"
             ],
             "scripts": [
-              "src/assets/js/setup.js",
-              "src/assets/js/libfluidsynth-2.2.1.js"
             ]
           },
           "configurations": {
@@ -39,8 +37,8 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kb",
-                  "maximumError": "1mb"
+                  "maximumWarning": "5mb",
+                  "maximumError": "10mb"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -104,6 +102,9 @@
             ],
             "scripts": []
           }
+        },
+        "deploy": {
+          "builder": "angular-cli-ghpages:deploy"
         }
       }
     }

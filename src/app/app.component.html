@@ -1,14 +1,13 @@
 <div id="wrapper">
-  <ng-container *ngIf="fluidReady;else not_ready">
-    <button (click)="doStart()">Start</button>
-    <button (click)="doStop()">Stop</button>
-    <button (click)="fsTest()">FS Test</button>
-    <button (click)="doFluid()">Fluid Test</button>
-    <br>
-    <button (click)="playNote(72,100)">Note on</button>
-    <button (click)="noteRun()">Notes</button>
-
-
-  </ng-container>
+  <div id="status">{{statusMsg}}</div>
+  <!--
+      <button (click)="doStart()">Start</button>
+      <button (click)="doStop()">Stop</button>
+      <button (click)="fetchSoundbank()">FS Test</button>
+      <button (click)="doFluid()">Fluid Test</button>
+      <br>
+  -->
+  <button [disabled]="!fluidReady" (click)="randomNote()">Random Note</button>
+  <button [disabled]="!fluidReady" (click)="noteRun()">Note Sweep</button>
 </div>
 <ng-template #not_ready>Initializing Fluid</ng-template>
