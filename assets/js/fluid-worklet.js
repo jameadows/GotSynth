@@ -16,10 +16,13 @@ class FluidWorklet extends AudioWorkletProcessor {
           this.loadSoundbank(event.data.bank);
           break;
         case 'note_on':
-          this.mod._fluid_synth_noteon(this.synth, 0, parseInt(event.data.note), 80);
+          this.mod._fluid_synth_noteon(this.synth, 0, event.data.note, event.data.velocity);
           break;
         case 'note_off':
-          this.mod._fluid_synth_noteoff(this.synth, 0, parseInt(event.data.note), 80);
+          this.mod._fluid_synth_noteoff(this.synth, 0, event.data.note, event.data.velocity);
+          break;
+        case 'program_change':
+          this.mod._fluid_synth_program_change(this.synth, event.data.channel, event.data.program);
           break;
         case 'stop':
           this.active = false;
