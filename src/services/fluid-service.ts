@@ -60,10 +60,16 @@ export class FLuidDeployer {
   }
 
   private startAudioProcessor(subject: Subject<FluidService>): void {
+    /*
+        var AudioWorkletGlobalScope = typeof AudioWorkletGlobalScope != 'undefined' ? AudioWorkletGlobalScope : {};
+        AudioWorkletGlobalScope['wasmModule']['onRuntimeInitialized'] = () => {
+          console.log("WASM IS AWAKE!");
+        }
+    */
 
     let context: AudioContext = new AudioContext({sampleRate: 48000});
-    context.audioWorklet.addModule(document.baseURI+'assets/js/libfluidsynth-2.2.1.js').then(() =>
-      context.audioWorklet.addModule(document.baseURI+FluidService.WorkletModule).then(() => {
+    context.audioWorklet.addModule(document.baseURI + 'assets/js/libfluidsynth-2.2.1.js').then(() => {
+      context.audioWorklet.addModule(document.baseURI + FluidService.WorkletModule).then(() => {
         let instance = new FluidService(context, {
           numberOfInputs: 0,
           numberOfOutputs: 1,
@@ -72,10 +78,29 @@ export class FLuidDeployer {
 
         return instance;
       }).then(instance => {
+        let initDone = false;
+        instance.port.onmessage = (event) => {
+          switch (event.data.type) {
+            case 'init':
+              console.log("Fluid worklet started");
+              initDone = true;
+              // this.fetchSoundbank();
+              break;
+          }
+        }
+        let id = setInterval(() => {
+          if (initDone) {
+            clearInterval(id);
+            instance.connect(context.destination);
+            subject.next(instance);
+          } else {
+            instance.port.postMessage({type: 'init'});
+          }
+        }, 100);
+
         // @ts-ignore
         // instance.port.postMessage({type: 'module', module: AudioWorkletGlobalScope.wasmModule})
-        instance.connect(context.destination);
-        subject.next(instance);
-      }).catch(err => subject.error(err)));
+      }).catch(err => subject.error(err))
+    });
   }
 }

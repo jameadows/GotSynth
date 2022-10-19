@@ -1,28 +1,46 @@
-import {AfterViewInit, ChangeDetectorRef, Component, Input} from '@angular/core';
-import {mergeMap} from "rxjs";
+import {AfterViewInit, ChangeDetectorRef, Component, OnInit} from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {FLuidDeployer, FluidService} from "../services/fluid-service";
 
 // const Module = require('./../assets/js/libfluidsynth-2.2.1')();
+import {GMPatches, PercPatches} from "./classes/patches";
+import {Measure, Track} from "./classes/elements";
+import {GlobalTime, TimeKeeperService} from "./services/time-keeper.service";
+import {SynthService} from "./services/synth.service";
+import {AppModule} from "./app.module";
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements AfterViewInit {
+export class AppComponent implements AfterViewInit, OnInit {
+  get program(): number {
+    return this._program;
+  }
+
+  set program(value: number) {
+    this._program = value;
+    this.synthService.setProgram(value, this.channel)
+  }
+
   title = 'GotSynth';
   mod: any;
-  private fluidService!: FluidService;
   public statusMsg = "";
-  public fluidReady = false;
+  private _program = 0;
+  public channel = 0;
+  public patches = GMPatches;
+  public drums = PercPatches;
+  public tracks: Track[];
+  private numTracks = 4;
+  private numMeasures = 1;
+  private beatsPerMeasure = 4;
+  public synthService: SynthService;
 
-  constructor(private http: HttpClient, private cd: ChangeDetectorRef, private fluidDeployer: FLuidDeployer, private httpClient: HttpClient) {
-    // const prm = this.instantiateWasm("/assets/js/libfluidsynth-2.2.1",{})
-    // @ts-ignore
-    // window['Module']._new_fluid_settings();
-    // var x=window.Module.instantiateAsync();
-    console.log("");
+  constructor(private http: HttpClient, private fluidDeployer: FLuidDeployer, private httpClient: HttpClient) {
+    this.tracks = [];
+    this.synthService = AppModule.injector.get(SynthService);
+    this.synthService.percussionMode=true;
     // @ts-ignore
     /*
         window.Module['onRuntimeInitialized'] = () => {
@@ -33,45 +51,25 @@ export class AppComponent implements AfterViewInit {
     */
   }
 
-  public doStart(): void {
-    this.statusMsg = "Loading synthesizer module";
-    this.fluidDeployer.startFluidService().subscribe({
-      next: instance => {
-        this.fluidService = instance;
-        this.statusMsg = "";
-        console.log("Fluid worklet started");
-        this.fetchSoundbank();
-      }, error: err => {
-        console.error(err);
-        alert("Failed to start synthesizer module");
-      }
-    });
+  public programChange($event): void {
+    this.synthService.programChange($event.target.value);
   }
 
-  public doStop():
-    void {
+  set percussionMode(value) {
+    this.synthService.percussionMode = value;
   }
 
-  public fetchSoundbank(): void {
-    this.statusMsg = "Fetching soundbank"
-    this.httpClient.get(document.baseURI + 'assets/Unison.sf2', {responseType: 'arraybuffer'}).subscribe(result => {
-      this.fluidService.port.postMessage({type: 'load_soundbank', bank: result});
-      this.statusMsg = "";
-      this.fluidReady = true;
-    });
+  get percussionMode(): boolean {
+    return this.synthService.percussionMode;
   }
 
   noteRun(): void {
-    if(this.fluidService.context.state != 'running')
-    {
-      this.fluidService.context['resume']();
-    }
-    let note = 60;
+    let note = 50;
     let inc = 1;
     let id = setInterval(() => {
-      this.playNote(note, 100);
+      this.playNote(note, 100, note * 2);
       note += inc;
-      if (note > 100) {
+      if (note > 62) {
         inc = -1;
       } else if (note < 50) {
         clearInterval(id);
@@ -79,89 +77,45 @@ export class AppComponent implements AfterViewInit {
     }, 100);
   }
 
-  playNote(note: number, duration: number) {
-    this.noteOn(note);
-    setTimeout(() => this.noteOff(note), duration);
+  playNote(note: number, duration: number, velocity = 127) {
+    this.synthService.noteOn(note, velocity);
+    setTimeout(() => this.synthService.noteOff(note), duration);
   }
 
   public randomNote(): void {
     const note = Math.floor(Math.random() * 80) + 20;
-    this.playNote(note, 250);
+    const velocity = Math.floor(Math.random() * 100) + 27;
+    this.playNote(note, 250, velocity);
   }
 
-  public noteOn(note = 60): void {
-    this.fluidService.port.postMessage({type: 'note_on', note: note});
-  }
-
-  public noteOff(note = 60): void {
-    this.fluidService.port.postMessage({type: 'note_off', note: note});
-  }
-
-  public doFluid() {
-    const mod = window.Module
-    const FLUID_FAILED = -1;
-
-
-    const fluidSettings = mod._new_fluid_settings();
-    const synth = mod._new_fluid_synth(fluidSettings);
-    if (!synth) {
-      console.error("Failed to create the synth!");
-      return;
-    }
-
-    const sfPath = "sf/Unison.sf2";
-    let length = mod.lengthBytesUTF8(sfPath) + 1;
-    let pcStr = mod._malloc(length);
-    mod.stringToUTF8(sfPath, pcStr, length);
-    const sfont_id = mod._fluid_synth_sfload(synth, pcStr, 1);
-    mod._free(pcStr);
-    if (sfont_id == FLUID_FAILED) {
-      console.error("Loading the SoundFont failed!");
-      return;
-    }
-
-    const driver = this.makeWAString('audio.driver');
-    const driverType = this.makeWAString("file");
-    mod._fluid_settings_setstr(fluidSettings, driver, driverType);
-    /*
-        const adriver = this.mod._new_fluid_audio_driver(fluidSettings, synth);
-        if (!adriver) {
-          console.error("Failed to create the audio driver!");
-          return;
-        }
-    */
-
-    const array = new Int32Array(this.mod.asm.memory.buffer, 128, 256)
-    const left = new Float32Array(this.mod.asm.memory.buffer, 1024 * 1024, 64 * 1024);
-    const right = new Float32Array(this.mod.asm.memory.buffer, 1024 * 1024 * 2, 64 * 1024);
-    array.set([left.byteOffset, right.byteOffset])
-
-
-    for (let i = 0; i < 128; i++) {
-      /* Generate a random key */
-      let key = 60 + Math.floor(128 * Math.random());
-
-      /* Play a note */
-      this.mod._fluid_synth_noteon(synth, 0, key, 80);
-      const result = this.mod._fluid_synth_process(synth, 48000, 0, null, 2, array.byteOffset);
-      /* Sleep for 1 second */
-      // sleep(1);
-
-      /* Stop the note */
-      this.mod._fluid_synth_noteoff(synth, 0, key);
-    }
-
-  }
-
-  private makeWAString(input: string
-  ): number {
-    const len = this.mod.lengthBytesUTF8(input) + 1;
-    const pcStr = this.mod._malloc(len);
-    this.mod.stringToUTF8(input, pcStr, len);
-    return pcStr;
-  }
 
   ngAfterViewInit(): void {
-    this.doStart();
+    GlobalTime.getClockListener().subscribe({
+      next: (position) => {
+        if (position >= this.numMeasures * 16) {
+          GlobalTime.clockStep = 0;
+        }
+      }
+    });
+    GlobalTime.stepDelay = 250;
+  }
+
+  public startBeats(): void {
+    GlobalTime.startClock();
+  }
+
+  public stopBeats(): void {
+    GlobalTime.stopClock();
+  }
+
+  ngOnInit(): void {
+    for (let i = 0; i < this.numTracks; i++) {
+      const track = new Track();
+      for (let j = 0; j < this.numMeasures; j++) {
+        track.measures.push(new Measure(this.beatsPerMeasure, j));
+      }
+      this.tracks.push(track);
+    }
+    this.synthService.start();
   }
 }

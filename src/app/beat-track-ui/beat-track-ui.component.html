@@ -1,0 +1,8 @@
+<div id="wrapper">
+  <select (change)="programChange($event)">
+    <option *ngFor="let patch of drums; index as num" [value]="num+35"
+            [selected]="track.note == num+35">{{patch}}</option>
+  </select>
+
+  <app-measure-ui *ngFor="let measure of track.measures" [measure]="measure"></app-measure-ui>
+</div>

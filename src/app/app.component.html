@@ -7,7 +7,20 @@
       <button (click)="doFluid()">Fluid Test</button>
       <br>
   -->
-  <button [disabled]="!fluidReady" (click)="randomNote()">Random Note</button>
-  <button [disabled]="!fluidReady" (click)="noteRun()">Note Sweep</button>
+  <button [disabled]="!synthService.synthActive" (click)="startBeats()">Start</button>
+  <button [disabled]="!synthService.synthActive" (click)="stopBeats()">Stop</button>
+  <button [disabled]="!synthService.synthActive" (click)="randomNote()">Random Note</button>
+  <button [disabled]="!synthService.synthActive" (click)="noteRun()">Note Sweep</button>
+  <select *ngIf="!percussionMode;else perc_select" (change)="programChange($event)">
+    <option *ngFor="let patch of patches; index as num" [value]="num+1" [selected]="program == num+1">{{patch}}</option>
+  </select>
+  <br>
+  <input type="checkbox" [(ngModel)]="percussionMode">Percussion
+  <app-beat-container [tracks]="tracks"></app-beat-container>
 </div>
-<ng-template #not_ready>Initializing Fluid</ng-template>
+<ng-template #perc_select>
+  <select (change)="programChange($event)">
+    <option *ngFor="let patch of drums; index as num" [value]="num+1" [selected]="program == num+1">{{patch}}</option>
+  </select>
+
+</ng-template>

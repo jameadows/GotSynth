@@ -7,19 +7,26 @@ class FluidWorklet extends AudioWorkletProcessor {
 
   constructor(options) {
     super();
+    this.initDone = false;
     this.active = true;
 
 
     this.port.onmessage = (event) => {
       switch (event.data.type) {
+        case 'init':
+          this.configureBuffers();
+          break;
         case 'load_soundbank':
           this.loadSoundbank(event.data.bank);
           break;
         case 'note_on':
-          this.mod._fluid_synth_noteon(this.synth, 0, parseInt(event.data.note), 80);
+          this.mod._fluid_synth_noteon(this.synth, event.data.channel, event.data.note, event.data.velocity);
           break;
         case 'note_off':
-          this.mod._fluid_synth_noteoff(this.synth, 0, parseInt(event.data.note), 80);
+          this.mod._fluid_synth_noteoff(this.synth, event.data.channel, event.data.note, event.data.velocity);
+          break;
+        case 'program_change':
+          this.mod._fluid_synth_program_change(this.synth, event.data.channel, event.data.program);
           break;
         case 'stop':
           this.active = false;
@@ -39,15 +46,30 @@ class FluidWorklet extends AudioWorkletProcessor {
           break;
       }
     };
-    this.pcmBuffers = new Int32Array(this.mod.asm.memory.buffer, 128, 2)
-    this.leftBuffer = new Float32Array(this.mod.asm.memory.buffer, 1024, 128);
-    this.rightBuffer = new Float32Array(this.mod.asm.memory.buffer, 2048, 128);
-    this.pcmBuffers.set([this.leftBuffer.byteOffset, this.rightBuffer.byteOffset])
-    const fluidSettings = this.mod._new_fluid_settings();
-    this.synth = this.mod._new_fluid_synth(fluidSettings);
-    if (!this.synth) {
-      console.error("Failed to create the synth!");
+  }
+
+  configureBuffers() {
+    if (this.initDone) {
+      this.port.postMessage({type: 'init'});
       return;
+    }
+
+    try {
+      this.pcmBuffers = new Int32Array(this.mod.asm.memory.buffer, 128, 2)
+      this.leftBuffer = new Float32Array(this.mod.asm.memory.buffer, 1024, 128);
+      this.rightBuffer = new Float32Array(this.mod.asm.memory.buffer, 2048, 128);
+      this.pcmBuffers.set([this.leftBuffer.byteOffset, this.rightBuffer.byteOffset])
+      const fluidSettings = this.mod._new_fluid_settings();
+      this.synth = this.mod._new_fluid_synth(fluidSettings);
+      if (!this.synth) {
+        console.error("Failed to create the synth!");
+        return;
+      }
+      this.initDone = true;
+      this.port.postMessage({type: 'init'});
+      console.log('Worklet config complete');
+    } catch {
+      console.error('Config not ready');
     }
   }
 
@@ -92,15 +114,16 @@ class FluidWorklet extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, parameters) {
-    for (let i = 0; i < 128; i++) {
-      this.leftBuffer[i] = this.rightBuffer[i] = 0;
+    if (this.initDone) {
+      for (let i = 0; i < 128; i++) {
+        this.leftBuffer[i] = this.rightBuffer[i] = 0;
+      }
+      const result = this.mod._fluid_synth_process(this.synth, 128, 0, null, 2, this.pcmBuffers.byteOffset);
+      for (let i = 0; i < 128; i++) {
+        outputs[0][0][i] = this.leftBuffer[i];
+        outputs[0][1][i] = this.rightBuffer[i];
+      }
     }
-    const result = this.mod._fluid_synth_process(this.synth, 128, 0, null, 2, this.pcmBuffers.byteOffset);
-    for (let i = 0; i < 128; i++) {
-      outputs[0][0][i] = this.leftBuffer[i];
-      outputs[0][1][i] = this.rightBuffer[i];
-    }
-
 
     return this.active;
   }
